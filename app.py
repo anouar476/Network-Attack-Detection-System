@@ -108,8 +108,7 @@ with tab1:
                 'dst_host_serror_rate': [0],
                 'dst_host_srv_serror_rate': [0],
                 'dst_host_rerror_rate': [0],
-                'dst_host_srv_rerror_rate': [0],
-                'level': [0]
+                'dst_host_srv_rerror_rate': [0]
             })
             
             # Encode categorical variables
@@ -134,11 +133,31 @@ with tab1:
 with tab2:
     st.subheader("Upload Test Data")
     st.info("""
-    Please upload a CSV file with the following format:
-    - No header row
-    - 41 columns in the NSL-KDD format
-    - You can use a subset of the test dataset
+    Format du fichier CSV attendu:
+    - 41 colonnes dans l'ordre du dataset NSL-KDD
+    - Pas de ligne d'en-tête
+    - Les données doivent être dans leur format brut (non encodées)
+    
+    Exemple de format:
+    ```
+    0,tcp,http,SF,181,5450,0,0,0,...
+    0,udp,private,SF,105,146,0,0,0,...
+    ```
     """)
+    
+    # Show example of column names
+    if st.checkbox("Voir l'ordre des colonnes"):
+        columns = ['duration', 'protocol_type', 'service', 'flag', 'src_bytes', 'dst_bytes', 'land', 'wrong_fragment',
+                  'urgent', 'hot', 'num_failed_logins', 'logged_in', 'num_compromised', 'root_shell', 'su_attempted',
+                  'num_root', 'num_file_creations', 'num_shells', 'num_access_files', 'num_outbound_cmds', 'is_host_login',
+                  'is_guest_login', 'count', 'srv_count', 'serror_rate', 'srv_serror_rate', 'rerror_rate', 'srv_rerror_rate',
+                  'same_srv_rate', 'diff_srv_rate', 'srv_diff_host_rate', 'dst_host_count', 'dst_host_srv_count',
+                  'dst_host_same_srv_rate', 'dst_host_diff_srv_rate', 'dst_host_same_src_port_rate',
+                  'dst_host_srv_diff_host_rate', 'dst_host_serror_rate', 'dst_host_srv_serror_rate', 'dst_host_rerror_rate',
+                  'dst_host_srv_rerror_rate']
+        st.write("Ordre des colonnes:")
+        for i, col in enumerate(columns, 1):
+            st.text(f"{i}. {col}")
     
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
     
@@ -149,8 +168,8 @@ with tab2:
             
             # Check the number of columns
             if len(test_data.columns) != 41:
-                st.error(f"Invalid number of columns. Your file has {len(test_data.columns)} columns, but the model expects 41 columns.")
-                st.info("Please make sure your CSV file follows the NSL-KDD dataset format.")
+                st.error(f"Nombre de colonnes invalide. Votre fichier a {len(test_data.columns)} colonnes, mais le modèle attend 41 colonnes.")
+                st.info("Assurez-vous que votre fichier suit le format du dataset NSL-KDD (sans les colonnes 'attack' et 'level').")
                 st.stop()
             
             # Set the column names
@@ -163,6 +182,10 @@ with tab2:
                       'dst_host_srv_diff_host_rate', 'dst_host_serror_rate', 'dst_host_srv_serror_rate', 'dst_host_rerror_rate',
                       'dst_host_srv_rerror_rate']
             test_data.columns = columns
+            
+            # Show raw data
+            st.write("### Données brutes (5 premières lignes)")
+            st.write(test_data.head())
             
             # Load the model and preprocessors
             model = joblib.load('knn_model.pkl')
@@ -178,8 +201,8 @@ with tab2:
                 try:
                     X_test[col] = label_encoders[col].transform(X_test[col])
                 except ValueError as e:
-                    st.error(f"Error encoding {col}: Found unknown categories. Make sure your data only contains values present in the training set.")
-                    st.info(f"Allowed values for {col}: {list(label_encoders[col].classes_)}")
+                    st.error(f"Erreur d'encodage pour {col}: Valeurs inconnues trouvées.")
+                    st.info(f"Valeurs autorisées pour {col}: {sorted(list(label_encoders[col].classes_))}")
                     st.stop()
             
             # Scale the features
@@ -194,40 +217,41 @@ with tab2:
             results['Predicted Attack'] = attack_types
             
             # Display results
-            st.write("### Prediction Results")
-            st.write(f"Total records processed: {len(results)}")
+            st.write("### Résultats des prédictions")
+            st.write(f"Nombre total d'enregistrements traités: {len(results)}")
             
             # Show prediction distribution
-            st.write("### Attack Type Distribution")
+            st.write("### Distribution des types d'attaques")
             attack_counts = pd.Series(attack_types).value_counts()
             st.bar_chart(attack_counts)
             
             # Display the results table
-            st.write("### Detailed Results")
+            st.write("### Résultats détaillés")
             st.write(results)
             
             # Add download button for results
             csv = results.to_csv(index=False)
             st.download_button(
-                label="Download Results as CSV",
+                label="Télécharger les résultats (CSV)",
                 data=csv,
                 file_name="prediction_results.csv",
                 mime="text/csv"
             )
             
         except Exception as e:
-            st.error(f"An error occurred while processing the file: {str(e)}")
+            st.error(f"Une erreur s'est produite lors du traitement du fichier: {str(e)}")
             st.info("""
-            Please make sure your CSV file matches the NSL-KDD format:
-            - 41 columns
-            - No header row
-            - Correct data types for each column
+            Assurez-vous que votre fichier CSV est au format NSL-KDD:
+            - 41 colonnes exactement
+            - Pas de ligne d'en-tête
+            - Les données doivent être dans leur format brut (non encodées)
+            - Les valeurs catégorielles doivent correspondre à celles du dataset d'entraînement
             """)
 
 # Add information about the model
-st.sidebar.header("About")
+st.sidebar.header("À propos")
 st.sidebar.info("""
-This application uses a K-Nearest Neighbors (KNN) classifier to detect network attacks.
-The model has been trained on the NSL-KDD dataset, which is a benchmark dataset for 
-network intrusion detection systems.
+Cette application utilise un classifieur K-Nearest Neighbors (KNN) pour détecter les attaques réseau.
+Le modèle a été entraîné sur le dataset NSL-KDD, qui est un dataset de référence pour 
+les systèmes de détection d'intrusion réseau.
 """) 

@@ -36,11 +36,7 @@ if not os.path.exists('knn_model.pkl'):
 
     train_data.columns = columns
     test_data.columns = columns
-
-    # Concaténer les données d'entraînement et de test
     full_data = pd.concat([train_data, test_data], ignore_index=True)
-
-    # Prétraitement des données : encodage des variables catégorielles
     label_encoders = {}
     categorical_columns = ['protocol_type', 'service', 'flag', 'attack']
 
@@ -48,15 +44,12 @@ if not os.path.exists('knn_model.pkl'):
         label_encoders[column] = LabelEncoder()
         full_data[column] = label_encoders[column].fit_transform(full_data[column])
 
-    # Séparer les features et la cible
-    X = full_data.drop('attack', axis=1)  # Features
+    X = full_data.drop(['attack', 'level'], axis=1) 
     y = full_data['attack']  # Cible
 
-    # Normalisation des données
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Séparer les données en ensemble d'entraînement et de test
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
     # Créer et entraîner le modèle KNN
@@ -90,8 +83,6 @@ else:
     with open('model_metrics.json', 'r') as f:
         metrics = json.load(f)
     print("Loaded metrics:", metrics)
-
-# Matrice de confusion
 conf_matrix = confusion_matrix(y_test, y_pred)
 plt.figure(figsize=(8, 6))
 sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
